@@ -22,11 +22,6 @@ logging.basicConfig(
 logger.setLevel(logging.DEBUG)
 
 
-
-# def logger(msg):
-#     pass
-
-
 def scan_single_file(dir_path, start_line, magic_word):
     """Scans a file from a start position for a given word."""
     global files
@@ -121,7 +116,7 @@ def main(args):
             watch_directory(p_args)
             
         except OSError as e:
-            if e.errno == errno.ENONET:
+            if e.errno == errno.ENOENT:
                 logger.error(f"{p_args.directory} directory not found")
                 time.sleep(2)
             else:
