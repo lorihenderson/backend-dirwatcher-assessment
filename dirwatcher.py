@@ -12,23 +12,25 @@ import sys
 exit_flag = False
 
 files = {}
+line_numbers = {}
 
 logger = logging.getLogger(__name__)
-
-logging.basicConfig(
-    format='%(asctime)s.%(msecs)03d %(name)-12s %(levelname)-8s %(message)s',
-    datefmt='%Y-%m-%d &%H:%M:%S',
-)
-logger.setLevel(logging.DEBUG)
 
 
 def scan_single_file(dir_path, start_line, magic_word):
     """Scans a file from a start position for a given word."""
-    global files
+    global line_numbers
     with open(dir_path) as f:
         for i, line in enumerate(f):
             if magic_word in line:
-                logger.info(f"{magic_word} found at line {i + 1}")
+                if dir_path in line_numbers:
+                    if line_numbers[dir_path] < i + 1:
+                        logger.info(f"{magic_word} found at line {i + 1}")
+                        line_numbers[dir_path] = i + 1
+                else:
+                    logger.info(f"{magic_word} found at line {i + 1}")
+                    line_numbers[dir_path] = i + 1
+
 
 
 def detect_added_files(file_list, ext):
@@ -76,22 +78,27 @@ def signal_handler(sig_num, frame):
 def create_parser():
     """Creates a parser"""
     parser = argparse.ArgumentParser(description="Watches a directory of text files for a magic string")
-    parser.add_argument("directory", help="specifies the directory to watch") # specify the directory to watch (*this directory may not yet exist!*) ##positional argument
-    parser.add_argument("magic_text", help="specifies the magic text to search for") # specifics the "magic text" to search for ##position argument
     parser.add_argument("-i", "--interval", help="controls the polling interval", type=float, default=1.0) # controls the polling interval (instead of hard-coding it)
     parser.add_argument("-e", "--extension", help="filters what kind of file extension to search within", type=str, default=".txt") # filters what kind of file extension to search within (i.e., `.txt`, `.log`)
+    parser.add_argument("directory", help="specifies the directory to watch") # specify the directory to watch (*this directory may not yet exist!*) ##positional argument
+    parser.add_argument("magic_text", help="specifies the magic text to search for") # specifics the "magic text" to search for ##position argument
     return parser
 
 
 def main(args):
-    """Main function is declared as a standalone."""   
+    """Main function is declared as a standalone."""
 
     parser = create_parser()
     p_args = parser.parse_args(args)
-    print("ARGS", p_args)
     polling_interval = p_args.interval
- 
+
     logger = logging.getLogger()
+
+    logging.basicConfig(
+    format='%(asctime)s.%(msecs)03d %(name)-12s %(levelname)-8s %(message)s',
+    datefmt='%Y-%m-%d &%H:%M:%S',
+    )
+    logger.setLevel(logging.DEBUG)
 
     start_time = time.time()
 
@@ -102,6 +109,7 @@ def main(args):
         f'   PID is {os.getpid()}\n'
         f'   Started on {start_time:.1f}\n'
         '-------------------------------------------------\n'
+        .format(__file__, start_time)
     )
 
     # Hook into these two signals from the OS
@@ -112,9 +120,8 @@ def main(args):
 
     while not exit_flag:
         try:
-            # call my directory watching function
             watch_directory(p_args)
-            
+
         except OSError as e:
             if e.errno == errno.ENOENT:
                 logger.error(f"{p_args.directory} directory not found")
@@ -128,7 +135,7 @@ def main(args):
 
         # put a sleep inside my while loop so I don't peg the cpu usage at 100%
         time.sleep(polling_interval)
-    
+
     end_time = time.time() - start_time
     # final exit point happens here
     # Log a message that we are shutting down
@@ -139,6 +146,7 @@ def main(args):
         f'   Stopped {__file__}\n'
         f'   Uptime was {end_time:.1f}\n'
         '-------------------------------------------------\n'
+        .format(__file__, end_time)
     )
     logging.shutdown()
 
